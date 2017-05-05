@@ -8,6 +8,7 @@
 ####################################################################################
 ###########################  CONFIGURABLE PARAMETERS  ##############################
 ####################################################################################
+import os
 
 # Font of plot captions, axes labels and ticks
 font = {'family': 'sans-serif',
@@ -283,13 +284,24 @@ def frc_plot(results_dir, ref_fpath, contigs_fpaths, contigs_aligned_lengths, fe
 
     plots = []
     max_y = 0
+    max_x = 0
     ref_length = sum(fastaparser.get_chr_lengths_from_fastafile(ref_fpath).values())
     json_vals_x = []  # coordinates for Nx-like plots in HTML-report
     json_vals_y = []
     max_features = max(sum(feature_in_contigs) for feature_in_contigs in features_in_contigs_by_file.values()) + 1
-
+    #create TSV file for metaquast features
+    outf = open(results_dir+os.sep+"metaquast_frc.tsv",'w')
+    outf.write("Assembly\tContig_ID\tContig_Length\tFeature_Count\tFeature_Type\n")
     aligned_contigs_fpaths = []
+    idx = 0
+    legend_list = [label_from_fpath(fpath) for fpath in contigs_fpaths]
+    max_len = 0
+    max_features = 0
     for contigs_fpath in contigs_fpaths:
+        x_vals = [0]
+        y_vals = [0]
+        cumulative_len = 0
+        cumulative_features = 0        
         aligned_lengths = contigs_aligned_lengths[contigs_fpath]
         feature_in_contigs = features_in_contigs_by_file[contigs_fpath]
         if not aligned_lengths or not feature_in_contigs:
@@ -299,36 +311,35 @@ def frc_plot(results_dir, ref_fpath, contigs_fpaths, contigs_aligned_lengths, fe
         len_with_zero_features = 0
         lengths = []
         non_zero_feature_in_contigs = []
+        ctg_idx = 1
+        #create unsorted TSV
         for l, feature in zip(aligned_lengths, feature_in_contigs):
+            if l > 0:
+                outf.write("%s\t%s\t%d\t%d\tMQ\n"%(legend_list[idx],ctg_idx,l, feature))
+                ctg_idx+=1
             if feature == 0:
                 len_with_zero_features += l
-            else:
+            if l > 0:
                 lengths.append(l)
                 non_zero_feature_in_contigs.append(feature)
-        optimal_sorted_tuples = sorted(zip(lengths, non_zero_feature_in_contigs),
-                                       key=lambda tuple: tuple[0] * 1.0 / tuple[1], reverse=True)  # sort by len/features ratio
+    
+        optimal_sorted_tuples = sorted(zip(lengths, non_zero_feature_in_contigs), reverse=True)  # sort by len/features ratio
         sorted_lengths = [tuple[0] for tuple in optimal_sorted_tuples]
         sorted_features = [tuple[1] for tuple in optimal_sorted_tuples]
-        x_vals = []
-        y_vals = []
-        for features_n in range(max_features):
-            features_cnt = 0
-            cumulative_len = len_with_zero_features
-            for l, feature in zip(sorted_lengths, sorted_features):
-                if features_cnt + feature <= features_n:
-                    features_cnt += feature
-                    cumulative_len += l
-                    if features_cnt == features_n:
-                        break
 
-            x_vals.append(features_n)
-            y_vals.append(cumulative_len * 100.0 / ref_length)
-            x_vals.append(features_n + 1)
-            y_vals.append(cumulative_len * 100.0 / ref_length)
+        for tuple in optimal_sorted_tuples:
+            cumulative_len += tuple[0]
+            cumulative_features += tuple[1]
+            y_vals.append(cumulative_features)
+            x_vals.append(cumulative_len )
+            #y_vals.append(cumulative_features)
+            #x_vals.append(cumulative_len )
 
-        json_vals_x.append(x_vals)
-        json_vals_y.append(y_vals)
+        json_vals_x.append(y_vals)
+        json_vals_y.append(x_vals)
         max_y = max(max_y, max(y_vals))
+        max_x = max(max_x, max(x_vals))
+        idx+=1
 
         color, ls = get_color_and_ls(contigs_fpath)
         plots.append(Plot(x_vals, y_vals, color, ls))
@@ -340,8 +351,8 @@ def frc_plot(results_dir, ref_fpath, contigs_fpaths, contigs_aligned_lengths, fe
     if can_draw_plots:
         title = 'FRCurve (' + title + ')'
         legend_list = [label_from_fpath(fpath) for fpath in aligned_contigs_fpaths]
-        create_plot(plot_fpath, title, plots, legend_list, x_label='Feature space', y_label='Genome coverage (%)',
-                    x_limit=[0, max_features], y_limit=[0, max(100, max_y)])
+        create_plot(plot_fpath, title, plots, legend_list, x_label='Cumulative length', y_label='Cumulative features',
+                    y_limit=[0, max_y], x_limit=[0, max_x])
 
 
 # common routine for Nx-plot and NGx-plot (and probably for others Nyx-plots in the future)
