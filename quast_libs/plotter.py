@@ -304,6 +304,8 @@ def frc_plot(results_dir, ref_fpath, contigs_fpaths, contigs_aligned_lengths, fe
         cumulative_features = 0        
         aligned_lengths = contigs_aligned_lengths[contigs_fpath]
         feature_in_contigs = features_in_contigs_by_file[contigs_fpath]
+        contigs_lens = fastaparser.get_chr_lengths_from_fastafile(contigs_fpath)
+        
         if not aligned_lengths or not feature_in_contigs:
             continue
 
@@ -315,7 +317,7 @@ def frc_plot(results_dir, ref_fpath, contigs_fpaths, contigs_aligned_lengths, fe
         #create unsorted TSV
         for l, feature in zip(aligned_lengths, feature_in_contigs):
             if l > 0:
-                outf.write("%s\t%s\t%d\t%d\tMQ\n"%(legend_list[idx],ctg_idx,l, feature))
+                outf.write("%s\t%s\t%d\t%d\t%s\n"%(legend_list[idx], ctg_idx, l, feature, title))
                 ctg_idx+=1
             if feature == 0:
                 len_with_zero_features += l
